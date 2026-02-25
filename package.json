@@ -6,12 +6,12 @@
   "scripts": {
     "dev": "concurrently \"npm run dev:server\" \"npm run dev:client\"",
     "dev:server": "ts-node server/index.ts",
-    "dev:client": "npm --prefix client run dev",
+    "dev:client": "cd client && npx vite",
     "build:server": "tsc -p server/tsconfig.json",
-    "build:client": "npm --prefix client run build",
+    "build:client": "cd client && npm run build",
     "build": "npm run build:server && npm run build:client",
     "start": "node dist/server/server/index.js",
-    "install:client": "npm --prefix client install"
+    "install:client": "cd client && npm install"
   },
   "dependencies": {
     "express": "^4.18.2"
