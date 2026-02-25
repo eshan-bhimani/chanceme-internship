@@ -787,6 +787,18 @@ export default function InternshipInputForm(): React.ReactElement {
                 </td>
               </tr>
               <tr>
+                <td className={styles.breakdownLabel}>
+                  Tier competitiveness penalty
+                </td>
+                <td
+                  className={styles.breakdownValue}
+                  style={{ color: result.breakdown.tierPenalty < 0 ? "rgba(255,100,100,0.9)" : "inherit" }}
+                >
+                  {result.breakdown.tierPenalty > 0 ? "+" : ""}
+                  {result.breakdown.tierPenalty} pts
+                </td>
+              </tr>
+              <tr>
                 <td className={styles.breakdownLabel}>Total</td>
                 <td className={styles.breakdownValue}>
                   {result.breakdown.total} pts

@@ -18,6 +18,7 @@ export interface CalculateChanceResponse {
     base: number;
     gpaBonus: number;
     internshipBonus: number;
+    tierPenalty: number;
     total: number;
   };
 }

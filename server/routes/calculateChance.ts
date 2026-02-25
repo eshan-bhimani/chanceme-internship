@@ -15,6 +15,17 @@ const TIER_LEVEL: Record<Tier, number> = {
   tier3: 1,
 };
 
+/**
+ * Competitiveness multiplier applied after summing base + GPA + internship.
+ * Tier 1 companies are significantly harder to land, so the raw score is
+ * scaled down proportionally. Tier 3 receives no penalty (multiplier = 1).
+ */
+const TIER_COMPETITIVENESS: Record<Tier, number> = {
+  tier1: 0.78, // ~22% reduction — elite competition
+  tier2: 0.91, // ~9%  reduction — strong competition
+  tier3: 1.00, // no reduction
+};
+
 const VALID_TIERS = new Set<string>(["tier1", "tier2", "tier3"]);
 const MAX_GPA = 4.0;
 const BASE_CHANCE = 10;
@@ -30,6 +41,11 @@ const BASE_CHANCE = 10;
  *      tier match only:     15 pts
  *      field match only:    10 pts
  *      no match:             3 pts  (any internship experience still counts)
+ *  - Tier competitiveness penalty:
+ *      Raw score is multiplied by a tier-specific factor before rounding.
+ *      Tier 1 targets apply a ~22% reduction; Tier 2 applies ~9%.
+ *      This means two identical profiles targeting Tier 1 vs Tier 2 will
+ *      yield a lower chance for the Tier 1 company.
  *  - Result capped at 95 (never 100 — nothing is guaranteed)
  */
 function computeChance(body: CalculateChanceRequest): CalculateChanceResponse {
@@ -61,10 +77,16 @@ function computeChance(body: CalculateChanceRequest): CalculateChanceResponse {
     }
   }
 
-  const total = Math.min(
-    Math.round(BASE_CHANCE + gpaBonus + internshipBonus),
-    95
-  );
+  const rawScore = BASE_CHANCE + gpaBonus + internshipBonus;
+
+  // Apply tier-specific competitiveness scaling
+  const multiplier = TIER_COMPETITIVENESS[targetInternship.tier];
+  const scaledScore = rawScore * multiplier;
+
+  // tierPenalty is the points deducted due to tier competitiveness (always <= 0)
+  const tierPenalty = Math.round((scaledScore - rawScore) * 10) / 10;
+
+  const total = Math.min(Math.round(scaledScore), 95);
 
   return {
     chance: total,
@@ -72,6 +94,7 @@ function computeChance(body: CalculateChanceRequest): CalculateChanceResponse {
       base: BASE_CHANCE,
       gpaBonus: Math.round(gpaBonus * 10) / 10,
       internshipBonus,
+      tierPenalty,
       total,
     },
   };
