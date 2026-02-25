@@ -48,6 +48,7 @@ function CompanySelector({
   const [query, setQuery] = useState(value);
   const wrapperRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
 
   // Sync external value changes
   useEffect(() => {
@@ -68,6 +69,13 @@ function CompanySelector({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
+  // Scroll dropdown to top when query changes
+  useEffect(() => {
+    if (dropdownRef.current) {
+      dropdownRef.current.scrollTop = 0;
+    }
+  }, [query]);
+
   const filterCompanies = useCallback(
     (list: CompanyEntry[]) => {
       if (!query) return list;
@@ -79,7 +87,8 @@ function CompanySelector({
 
   const filteredTier1 = filterCompanies(TIER1_COMPANIES);
   const filteredTier2 = filterCompanies(TIER2_COMPANIES);
-  const hasResults = filteredTier1.length > 0 || filteredTier2.length > 0;
+  const totalResults = filteredTier1.length + filteredTier2.length;
+  const hasResults = totalResults > 0;
 
   function selectCompany(entry: CompanyEntry) {
     setQuery(entry.name);
@@ -119,6 +128,7 @@ function CompanySelector({
       <div className={styles.companyInputRow}>
         {matched && (
           <img
+            key={matched.name}
             src={matched.logo}
             alt={`${matched.name} logo`}
             className={styles.companyLogo}
@@ -140,11 +150,11 @@ function CompanySelector({
             autoComplete="off"
           />
           {open && (
-            <div className={styles.dropdown}>
+            <div className={styles.dropdown} ref={dropdownRef}>
               {filteredTier1.length > 0 && (
                 <>
                   <div className={styles.dropdownGroupLabel}>
-                    Tier 1 — FAANG & Top-tier
+                    Tier 1 — FAANG & Top-tier ({filteredTier1.length})
                   </div>
                   {filteredTier1.map((c) => (
                     <div
@@ -173,7 +183,7 @@ function CompanySelector({
               {filteredTier2.length > 0 && (
                 <>
                   <div className={styles.dropdownGroupLabel}>
-                    Tier 2 — Well-known
+                    Tier 2 — Well-known ({filteredTier2.length})
                   </div>
                   {filteredTier2.map((c) => (
                     <div
@@ -207,6 +217,12 @@ function CompanySelector({
               {!query && (
                 <div className={styles.dropdownCustomHint}>
                   Type to search or enter a custom company name
+                </div>
+              )}
+              {hasResults && totalResults > 8 && (
+                <div className={styles.dropdownScrollHint}>
+                  <span className={styles.dropdownScrollHintArrow}>↓</span>
+                  Scroll to see more companies
                 </div>
               )}
             </div>
