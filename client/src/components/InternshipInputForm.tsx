@@ -1,5 +1,14 @@
-import React, { useState } from "react";
+import React, { useState, useRef, useEffect, useCallback } from "react";
 import type { CalculateChanceResponse, Tier } from "../../../shared/types";
+import {
+  TIER1_COMPANIES,
+  TIER2_COMPANIES,
+  findCompany,
+  type CompanyEntry,
+} from "../data/companies";
+import styles from "./InternshipInputForm.module.css";
+
+/* ─── Local interfaces ─── */
 
 interface PreviousInternship {
   company: string;
@@ -20,11 +29,211 @@ interface TargetInternship {
   tier: Tier;
 }
 
-const TIER_OPTIONS: { value: Tier; label: string }[] = [
-  { value: "tier1", label: "Tier 1 (Top-tier / FAANG-level)" },
-  { value: "tier2", label: "Tier 2 (Mid-size / well-known)" },
-  { value: "tier3", label: "Tier 3 (Startup / local)" },
-];
+/* ─── Company selector sub-component ─── */
+
+interface CompanySelectorProps {
+  value: string;
+  tier: Tier;
+  onCompanyChange: (company: string, tier: Tier) => void;
+  placeholder?: string;
+}
+
+function CompanySelector({
+  value,
+  tier,
+  onCompanyChange,
+  placeholder = "Search or select a company…",
+}: CompanySelectorProps) {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState(value);
+  const wrapperRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  // Sync external value changes
+  useEffect(() => {
+    setQuery(value);
+  }, [value]);
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (
+        wrapperRef.current &&
+        !wrapperRef.current.contains(e.target as Node)
+      ) {
+        setOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const filterCompanies = useCallback(
+    (list: CompanyEntry[]) => {
+      if (!query) return list;
+      const q = query.toLowerCase();
+      return list.filter((c) => c.name.toLowerCase().includes(q));
+    },
+    [query]
+  );
+
+  const filteredTier1 = filterCompanies(TIER1_COMPANIES);
+  const filteredTier2 = filterCompanies(TIER2_COMPANIES);
+  const hasResults = filteredTier1.length > 0 || filteredTier2.length > 0;
+
+  function selectCompany(entry: CompanyEntry) {
+    setQuery(entry.name);
+    onCompanyChange(entry.name, entry.tier);
+    setOpen(false);
+  }
+
+  function handleInputChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const val = e.target.value;
+    setQuery(val);
+    setOpen(true);
+
+    // Check if typed value matches a known company
+    const match = findCompany(val);
+    if (match) {
+      onCompanyChange(match.name, match.tier);
+    } else {
+      onCompanyChange(val, "tier3");
+    }
+  }
+
+  function handleFocus() {
+    setOpen(true);
+  }
+
+  function handleKeyDown(e: React.KeyboardEvent) {
+    if (e.key === "Escape") {
+      setOpen(false);
+      inputRef.current?.blur();
+    }
+  }
+
+  const matched = findCompany(value);
+
+  return (
+    <div className={styles.companyFieldWrapper} ref={wrapperRef}>
+      <div className={styles.companyInputRow}>
+        {matched && (
+          <img
+            src={matched.logo}
+            alt={`${matched.name} logo`}
+            className={styles.companyLogo}
+            onError={(e) => {
+              (e.target as HTMLImageElement).style.display = "none";
+            }}
+          />
+        )}
+        <div className={styles.companyInputWrapper}>
+          <input
+            ref={inputRef}
+            className={styles.companyInput}
+            type="text"
+            value={query}
+            onChange={handleInputChange}
+            onFocus={handleFocus}
+            onKeyDown={handleKeyDown}
+            placeholder={placeholder}
+            autoComplete="off"
+          />
+          {open && (
+            <div className={styles.dropdown}>
+              {filteredTier1.length > 0 && (
+                <>
+                  <div className={styles.dropdownGroupLabel}>
+                    Tier 1 — FAANG & Top-tier
+                  </div>
+                  {filteredTier1.map((c) => (
+                    <div
+                      key={c.name}
+                      className={styles.dropdownItem}
+                      onMouseDown={() => selectCompany(c)}
+                    >
+                      <img
+                        src={c.logo}
+                        alt=""
+                        className={styles.dropdownItemLogo}
+                        onError={(e) => {
+                          (e.target as HTMLImageElement).style.display = "none";
+                        }}
+                      />
+                      <span className={styles.dropdownItemName}>{c.name}</span>
+                      <span
+                        className={`${styles.dropdownTierBadge} ${styles.tierBadge1}`}
+                      >
+                        T1
+                      </span>
+                    </div>
+                  ))}
+                </>
+              )}
+              {filteredTier2.length > 0 && (
+                <>
+                  <div className={styles.dropdownGroupLabel}>
+                    Tier 2 — Well-known
+                  </div>
+                  {filteredTier2.map((c) => (
+                    <div
+                      key={c.name}
+                      className={styles.dropdownItem}
+                      onMouseDown={() => selectCompany(c)}
+                    >
+                      <img
+                        src={c.logo}
+                        alt=""
+                        className={styles.dropdownItemLogo}
+                        onError={(e) => {
+                          (e.target as HTMLImageElement).style.display = "none";
+                        }}
+                      />
+                      <span className={styles.dropdownItemName}>{c.name}</span>
+                      <span
+                        className={`${styles.dropdownTierBadge} ${styles.tierBadge2}`}
+                      >
+                        T2
+                      </span>
+                    </div>
+                  ))}
+                </>
+              )}
+              {!hasResults && query && (
+                <div className={styles.dropdownCustomHint}>
+                  Press Enter or continue typing — custom company (Tier 3)
+                </div>
+              )}
+              {!query && (
+                <div className={styles.dropdownCustomHint}>
+                  Type to search or enter a custom company name
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+      {/* Hidden display showing resolved tier */}
+      {value && (
+        <div
+          style={{
+            marginTop: "0.3rem",
+            fontSize: "0.7rem",
+            color: "rgba(255,255,255,0.3)",
+          }}
+        >
+          {tier === "tier1"
+            ? "Tier 1 — FAANG-level"
+            : tier === "tier2"
+              ? "Tier 2 — Well-known"
+              : "Tier 3 — Other"}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ─── Helpers ─── */
 
 const emptyPreviousInternship = (): PreviousInternship => ({
   company: "",
@@ -33,8 +242,12 @@ const emptyPreviousInternship = (): PreviousInternship => ({
   tier: "tier3",
 });
 
+/* ─── Main form component ─── */
+
 export default function InternshipInputForm(): React.ReactElement {
-  const [previousInternships, setPreviousInternships] = useState<PreviousInternship[]>([]);
+  const [previousInternships, setPreviousInternships] = useState<
+    PreviousInternship[]
+  >([]);
   const [academic, setAcademic] = useState<AcademicInfo>({
     university: "",
     gpa: "",
@@ -48,6 +261,8 @@ export default function InternshipInputForm(): React.ReactElement {
   const [result, setResult] = useState<CalculateChanceResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+
+  /* Internship list helpers */
 
   function addInternship() {
     setPreviousInternships((prev) => [...prev, emptyPreviousInternship()]);
@@ -63,9 +278,13 @@ export default function InternshipInputForm(): React.ReactElement {
     value: PreviousInternship[K]
   ) {
     setPreviousInternships((prev) =>
-      prev.map((item, i) => (i === index ? { ...item, [field]: value } : item))
+      prev.map((item, i) =>
+        i === index ? { ...item, [field]: value } : item
+      )
     );
   }
+
+  /* Submit */
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -79,11 +298,13 @@ export default function InternshipInputForm(): React.ReactElement {
     }
 
     const payload = {
-      previousInternships: previousInternships.map(({ company, position, tier }) => ({
-        company,
-        field: position,
-        tier,
-      })),
+      previousInternships: previousInternships.map(
+        ({ company, position, tier }) => ({
+          company,
+          field: position,
+          tier,
+        })
+      ),
       gpa: gpaNum,
       targetInternship: {
         company: target.company,
@@ -100,10 +321,13 @@ export default function InternshipInputForm(): React.ReactElement {
         body: JSON.stringify(payload),
       });
 
-      const data: CalculateChanceResponse | { error: string } = await response.json();
+      const data: CalculateChanceResponse | { error: string } =
+        await response.json();
 
       if (!response.ok) {
-        setError((data as { error: string }).error ?? "An unexpected error occurred.");
+        setError(
+          (data as { error: string }).error ?? "An unexpected error occurred."
+        );
       } else {
         setResult(data as CalculateChanceResponse);
       }
@@ -114,207 +338,212 @@ export default function InternshipInputForm(): React.ReactElement {
     }
   }
 
+  /* ─── Render ─── */
+
   return (
-    <div style={styles.container}>
-      <h1 style={styles.heading}>Internship Chance Calculator</h1>
+    <div className={styles.container}>
+      <h1 className={styles.heading}>Internship Chance Calculator</h1>
+      <p className={styles.subtitle}>
+        Estimate your odds at landing your dream internship.
+      </p>
 
-      <form onSubmit={handleSubmit} style={styles.form} noValidate>
+      <form onSubmit={handleSubmit} className={styles.form} noValidate>
+        {/* ── Academic Information ── */}
+        <section className={styles.section}>
+          <h2 className={styles.sectionTitle}>Academic Information</h2>
 
-        {/* Academic Information */}
-        <section style={styles.section}>
-          <h2 style={styles.sectionTitle}>Academic Information</h2>
-
-          <label style={styles.label}>
+          <label className={styles.label}>
             University
             <input
-              style={styles.input}
+              className={styles.input}
               type="text"
               value={academic.university}
-              onChange={(e) => setAcademic({ ...academic, university: e.target.value })}
+              onChange={(e) =>
+                setAcademic({ ...academic, university: e.target.value })
+              }
               placeholder="e.g. MIT"
             />
           </label>
 
-          <label style={styles.label}>
-            GPA <span style={styles.required}>*</span>
+          <label className={styles.label}>
+            GPA <span className={styles.required}>*</span>
             <input
-              style={styles.input}
+              className={styles.input}
               type="number"
               step="0.01"
               min="0"
               max="4"
               value={academic.gpa}
-              onChange={(e) => setAcademic({ ...academic, gpa: e.target.value })}
+              onChange={(e) =>
+                setAcademic({ ...academic, gpa: e.target.value })
+              }
               placeholder="0.00 – 4.00"
               required
             />
           </label>
 
-          <label style={styles.label}>
+          <label className={styles.label}>
             Major
             <input
-              style={styles.input}
+              className={styles.input}
               type="text"
               value={academic.major}
-              onChange={(e) => setAcademic({ ...academic, major: e.target.value })}
+              onChange={(e) =>
+                setAcademic({ ...academic, major: e.target.value })
+              }
               placeholder="e.g. Computer Science"
             />
           </label>
         </section>
 
-        {/* Target Internship */}
-        <section style={styles.section}>
-          <h2 style={styles.sectionTitle}>Target Internship</h2>
+        {/* ── Target Internship ── */}
+        <section className={styles.section}>
+          <h2 className={styles.sectionTitle}>Target Internship</h2>
 
-          <label style={styles.label}>
-            Company <span style={styles.required}>*</span>
-            <input
-              style={styles.input}
-              type="text"
+          <div className={styles.label}>
+            Company <span className={styles.required}>*</span>
+            <CompanySelector
               value={target.company}
-              onChange={(e) => setTarget({ ...target, company: e.target.value })}
-              placeholder="e.g. Google"
-              required
+              tier={target.tier}
+              onCompanyChange={(company, tier) =>
+                setTarget({ ...target, company, tier })
+              }
+              placeholder="Search Google, Meta, Stripe…"
             />
-          </label>
+          </div>
 
-          <label style={styles.label}>
-            Position / Field <span style={styles.required}>*</span>
+          <label className={styles.label}>
+            Position / Field <span className={styles.required}>*</span>
             <input
-              style={styles.input}
+              className={styles.input}
               type="text"
               value={target.position}
-              onChange={(e) => setTarget({ ...target, position: e.target.value })}
+              onChange={(e) =>
+                setTarget({ ...target, position: e.target.value })
+              }
               placeholder="e.g. Software Engineering"
               required
             />
           </label>
-
-          <label style={styles.label}>
-            Company Tier <span style={styles.required}>*</span>
-            <select
-              style={styles.select}
-              value={target.tier}
-              onChange={(e) => setTarget({ ...target, tier: e.target.value as Tier })}
-              required
-            >
-              {TIER_OPTIONS.map((opt) => (
-                <option key={opt.value} value={opt.value}>
-                  {opt.label}
-                </option>
-              ))}
-            </select>
-          </label>
         </section>
 
-        {/* Previous Internships */}
-        <section style={styles.section}>
-          <div style={styles.sectionHeader}>
-            <h2 style={styles.sectionTitle}>Previous Internships</h2>
-            <button type="button" onClick={addInternship} style={styles.addButton}>
+        {/* ── Previous Internships ── */}
+        <section className={styles.section}>
+          <div className={styles.sectionHeader}>
+            <h2 className={styles.sectionTitle}>Previous Internships</h2>
+            <button
+              type="button"
+              onClick={addInternship}
+              className={styles.addButton}
+            >
               + Add
             </button>
           </div>
 
           {previousInternships.length === 0 && (
-            <p style={styles.emptyNote}>No previous internships added. Click "+ Add" to include one.</p>
+            <p className={styles.emptyNote}>
+              No previous internships added yet.
+            </p>
           )}
 
           {previousInternships.map((internship, index) => (
-            <div key={index} style={styles.internshipCard}>
-              <div style={styles.cardHeader}>
-                <span style={styles.cardTitle}>Internship #{index + 1}</span>
+            <div key={index} className={styles.internshipCard}>
+              <div className={styles.cardHeader}>
+                <span className={styles.cardTitle}>
+                  Internship #{index + 1}
+                </span>
                 <button
                   type="button"
                   onClick={() => removeInternship(index)}
-                  style={styles.removeButton}
+                  className={styles.removeButton}
                 >
                   Remove
                 </button>
               </div>
 
-              <label style={styles.label}>
-                Company <span style={styles.required}>*</span>
-                <input
-                  style={styles.input}
-                  type="text"
+              <div className={styles.label}>
+                Company <span className={styles.required}>*</span>
+                <CompanySelector
                   value={internship.company}
-                  onChange={(e) => updateInternship(index, "company", e.target.value)}
-                  placeholder="e.g. Meta"
-                  required
+                  tier={internship.tier}
+                  onCompanyChange={(company, tier) => {
+                    updateInternship(index, "company", company);
+                    updateInternship(index, "tier", tier);
+                  }}
+                  placeholder="e.g. Meta, Stripe…"
                 />
-              </label>
+              </div>
 
-              <label style={styles.label}>
-                Position / Field <span style={styles.required}>*</span>
+              <label className={styles.label}>
+                Position / Field <span className={styles.required}>*</span>
                 <input
-                  style={styles.input}
+                  className={styles.input}
                   type="text"
                   value={internship.position}
-                  onChange={(e) => updateInternship(index, "position", e.target.value)}
+                  onChange={(e) =>
+                    updateInternship(index, "position", e.target.value)
+                  }
                   placeholder="e.g. Software Engineering"
                   required
                 />
               </label>
 
-              <label style={styles.label}>
+              <label className={styles.label}>
                 Duration
                 <input
-                  style={styles.input}
+                  className={styles.input}
                   type="text"
                   value={internship.duration}
-                  onChange={(e) => updateInternship(index, "duration", e.target.value)}
+                  onChange={(e) =>
+                    updateInternship(index, "duration", e.target.value)
+                  }
                   placeholder="e.g. 3 months"
                 />
-              </label>
-
-              <label style={styles.label}>
-                Company Tier <span style={styles.required}>*</span>
-                <select
-                  style={styles.select}
-                  value={internship.tier}
-                  onChange={(e) => updateInternship(index, "tier", e.target.value as Tier)}
-                  required
-                >
-                  {TIER_OPTIONS.map((opt) => (
-                    <option key={opt.value} value={opt.value}>
-                      {opt.label}
-                    </option>
-                  ))}
-                </select>
               </label>
             </div>
           ))}
         </section>
 
-        {error && <p style={styles.errorMessage}>{error}</p>}
+        {error && <p className={styles.errorMessage}>{error}</p>}
 
-        <button type="submit" style={styles.submitButton} disabled={loading}>
-          {loading ? "Calculating..." : "Calculate My Chance"}
+        <button
+          type="submit"
+          className={styles.submitButton}
+          disabled={loading}
+        >
+          {loading ? "Calculating…" : "Calculate My Chance"}
         </button>
       </form>
 
       {result && (
-        <div style={styles.resultCard}>
-          <h2 style={styles.resultTitle}>Your Estimated Chance</h2>
-          <p style={styles.chanceDisplay}>{result.chance}%</p>
-          <table style={styles.breakdownTable}>
+        <div className={styles.resultCard}>
+          <h2 className={styles.resultTitle}>Your Estimated Chance</h2>
+          <p className={styles.chanceDisplay}>{result.chance}%</p>
+          <table className={styles.breakdownTable}>
             <tbody>
               <tr>
-                <td style={styles.breakdownLabel}>Base score</td>
-                <td style={styles.breakdownValue}>{result.breakdown.base} pts</td>
+                <td className={styles.breakdownLabel}>Base score</td>
+                <td className={styles.breakdownValue}>
+                  {result.breakdown.base} pts
+                </td>
               </tr>
               <tr>
-                <td style={styles.breakdownLabel}>GPA bonus</td>
-                <td style={styles.breakdownValue}>{result.breakdown.gpaBonus} pts</td>
+                <td className={styles.breakdownLabel}>GPA bonus</td>
+                <td className={styles.breakdownValue}>
+                  {result.breakdown.gpaBonus} pts
+                </td>
               </tr>
               <tr>
-                <td style={styles.breakdownLabel}>Internship bonus</td>
-                <td style={styles.breakdownValue}>{result.breakdown.internshipBonus} pts</td>
+                <td className={styles.breakdownLabel}>Internship bonus</td>
+                <td className={styles.breakdownValue}>
+                  {result.breakdown.internshipBonus} pts
+                </td>
               </tr>
               <tr>
-                <td style={styles.breakdownLabel}>Total</td>
-                <td style={styles.breakdownValue}>{result.breakdown.total} pts</td>
+                <td className={styles.breakdownLabel}>Total</td>
+                <td className={styles.breakdownValue}>
+                  {result.breakdown.total} pts
+                </td>
               </tr>
             </tbody>
           </table>
@@ -323,162 +552,3 @@ export default function InternshipInputForm(): React.ReactElement {
     </div>
   );
 }
-
-const styles: Record<string, React.CSSProperties> = {
-  container: {
-    maxWidth: 640,
-    margin: "0 auto",
-    padding: "2rem 1rem",
-    fontFamily: "'Segoe UI', system-ui, sans-serif",
-    color: "#1a1a1a",
-  },
-  heading: {
-    fontSize: "1.75rem",
-    fontWeight: 700,
-    marginBottom: "1.5rem",
-  },
-  form: {
-    display: "flex",
-    flexDirection: "column",
-    gap: "1.5rem",
-  },
-  section: {
-    background: "#f9f9f9",
-    border: "1px solid #e0e0e0",
-    borderRadius: 8,
-    padding: "1.25rem",
-    display: "flex",
-    flexDirection: "column",
-    gap: "0.75rem",
-  },
-  sectionHeader: {
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: "0.25rem",
-  },
-  sectionTitle: {
-    fontSize: "1.1rem",
-    fontWeight: 600,
-    margin: 0,
-  },
-  label: {
-    display: "flex",
-    flexDirection: "column",
-    gap: "0.25rem",
-    fontSize: "0.9rem",
-    fontWeight: 500,
-  },
-  required: { color: "#d32f2f" },
-  input: {
-    padding: "0.5rem 0.75rem",
-    borderRadius: 6,
-    border: "1px solid #ccc",
-    fontSize: "0.95rem",
-    outline: "none",
-  },
-  select: {
-    padding: "0.5rem 0.75rem",
-    borderRadius: 6,
-    border: "1px solid #ccc",
-    fontSize: "0.95rem",
-    background: "#fff",
-    outline: "none",
-  },
-  addButton: {
-    padding: "0.35rem 0.85rem",
-    borderRadius: 6,
-    border: "1px solid #1976d2",
-    background: "#fff",
-    color: "#1976d2",
-    fontWeight: 600,
-    cursor: "pointer",
-    fontSize: "0.875rem",
-  },
-  internshipCard: {
-    background: "#fff",
-    border: "1px solid #ddd",
-    borderRadius: 6,
-    padding: "1rem",
-    display: "flex",
-    flexDirection: "column",
-    gap: "0.65rem",
-  },
-  cardHeader: {
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "center",
-  },
-  cardTitle: {
-    fontWeight: 600,
-    fontSize: "0.875rem",
-    color: "#555",
-  },
-  removeButton: {
-    padding: "0.25rem 0.6rem",
-    borderRadius: 4,
-    border: "1px solid #d32f2f",
-    background: "#fff",
-    color: "#d32f2f",
-    cursor: "pointer",
-    fontSize: "0.8rem",
-  },
-  emptyNote: {
-    color: "#888",
-    fontSize: "0.875rem",
-    margin: 0,
-  },
-  submitButton: {
-    padding: "0.75rem",
-    borderRadius: 8,
-    border: "none",
-    background: "#1976d2",
-    color: "#fff",
-    fontSize: "1rem",
-    fontWeight: 600,
-    cursor: "pointer",
-  },
-  errorMessage: {
-    color: "#d32f2f",
-    background: "#fff5f5",
-    border: "1px solid #f5c6c6",
-    borderRadius: 6,
-    padding: "0.65rem 1rem",
-    fontSize: "0.9rem",
-    margin: 0,
-  },
-  resultCard: {
-    marginTop: "2rem",
-    background: "#e8f5e9",
-    border: "1px solid #a5d6a7",
-    borderRadius: 8,
-    padding: "1.5rem",
-    textAlign: "center",
-  },
-  resultTitle: {
-    fontSize: "1.1rem",
-    fontWeight: 600,
-    margin: "0 0 0.5rem",
-  },
-  chanceDisplay: {
-    fontSize: "3rem",
-    fontWeight: 700,
-    color: "#2e7d32",
-    margin: "0.5rem 0 1rem",
-  },
-  breakdownTable: {
-    margin: "0 auto",
-    borderCollapse: "collapse",
-    fontSize: "0.875rem",
-    textAlign: "left",
-  },
-  breakdownLabel: {
-    padding: "0.2rem 1rem 0.2rem 0",
-    color: "#555",
-  },
-  breakdownValue: {
-    padding: "0.2rem 0",
-    fontWeight: 600,
-    color: "#1a1a1a",
-  },
-};
