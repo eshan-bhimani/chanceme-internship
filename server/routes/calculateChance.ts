@@ -4,7 +4,7 @@ import {
   CalculateChanceResponse,
   Internship,
   Tier,
-} from "../types";
+} from "../../shared/types";
 
 const router = Router();
 

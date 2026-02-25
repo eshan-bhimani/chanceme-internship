@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import type { CalculateChanceResponse, Tier } from "../types";
+import type { CalculateChanceResponse, Tier } from "../../../shared/types";
 
 interface PreviousInternship {
   company: string;
@@ -49,8 +49,6 @@ export default function InternshipInputForm(): React.ReactElement {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
-  // ── Previous internship helpers ──────────────────────────────────────────
-
   function addInternship() {
     setPreviousInternships((prev) => [...prev, emptyPreviousInternship()]);
   }
@@ -68,8 +66,6 @@ export default function InternshipInputForm(): React.ReactElement {
       prev.map((item, i) => (i === index ? { ...item, [field]: value } : item))
     );
   }
-
-  // ── Submit ───────────────────────────────────────────────────────────────
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -118,15 +114,13 @@ export default function InternshipInputForm(): React.ReactElement {
     }
   }
 
-  // ── Render ───────────────────────────────────────────────────────────────
-
   return (
     <div style={styles.container}>
       <h1 style={styles.heading}>Internship Chance Calculator</h1>
 
       <form onSubmit={handleSubmit} style={styles.form} noValidate>
 
-        {/* ── Academic Information ────────────────────────────────────────── */}
+        {/* Academic Information */}
         <section style={styles.section}>
           <h2 style={styles.sectionTitle}>Academic Information</h2>
 
@@ -168,7 +162,7 @@ export default function InternshipInputForm(): React.ReactElement {
           </label>
         </section>
 
-        {/* ── Target Internship ───────────────────────────────────────────── */}
+        {/* Target Internship */}
         <section style={styles.section}>
           <h2 style={styles.sectionTitle}>Target Internship</h2>
 
@@ -213,7 +207,7 @@ export default function InternshipInputForm(): React.ReactElement {
           </label>
         </section>
 
-        {/* ── Previous Internships ────────────────────────────────────────── */}
+        {/* Previous Internships */}
         <section style={styles.section}>
           <div style={styles.sectionHeader}>
             <h2 style={styles.sectionTitle}>Previous Internships</h2>
@@ -293,15 +287,13 @@ export default function InternshipInputForm(): React.ReactElement {
           ))}
         </section>
 
-        {/* ── Submit ──────────────────────────────────────────────────────── */}
         {error && <p style={styles.errorMessage}>{error}</p>}
 
         <button type="submit" style={styles.submitButton} disabled={loading}>
-          {loading ? "Calculating…" : "Calculate My Chance"}
+          {loading ? "Calculating..." : "Calculate My Chance"}
         </button>
       </form>
 
-      {/* ── Result ────────────────────────────────────────────────────────── */}
       {result && (
         <div style={styles.resultCard}>
           <h2 style={styles.resultTitle}>Your Estimated Chance</h2>
@@ -331,8 +323,6 @@ export default function InternshipInputForm(): React.ReactElement {
     </div>
   );
 }
-
-// ── Inline styles ────────────────────────────────────────────────────────────
 
 const styles: Record<string, React.CSSProperties> = {
   container: {
@@ -379,9 +369,7 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: "0.9rem",
     fontWeight: 500,
   },
-  required: {
-    color: "#d32f2f",
-  },
+  required: { color: "#d32f2f" },
   input: {
     padding: "0.5rem 0.75rem",
     borderRadius: 6,
