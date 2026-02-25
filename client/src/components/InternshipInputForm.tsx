@@ -1,4 +1,11 @@
-import React, { useState, useRef, useEffect, useCallback } from "react";
+import React, {
+  useState,
+  useRef,
+  useEffect,
+  useCallback,
+  useMemo,
+} from "react";
+import { createPortal } from "react-dom";
 import type { CalculateChanceResponse, Tier } from "../../../shared/types";
 import {
   TIER1_COMPANIES,
@@ -6,6 +13,11 @@ import {
   findCompany,
   type CompanyEntry,
 } from "../data/companies";
+import {
+  TOP_UNIVERSITIES,
+  findUniversity,
+  type UniversityEntry,
+} from "../data/universities";
 import styles from "./InternshipInputForm.module.css";
 
 /* ─── Local interfaces ─── */
@@ -29,6 +41,39 @@ interface TargetInternship {
   tier: Tier;
 }
 
+/* ─── Portal-based dropdown hook ─── */
+
+function useDropdownPortal(
+  open: boolean,
+  inputRef: React.RefObject<HTMLInputElement | null>
+) {
+  const [position, setPosition] = useState({ top: 0, left: 0, width: 0 });
+
+  useEffect(() => {
+    if (!open || !inputRef.current) return;
+
+    function updatePosition() {
+      if (!inputRef.current) return;
+      const rect = inputRef.current.getBoundingClientRect();
+      setPosition({
+        top: rect.bottom + 6 + window.scrollY,
+        left: rect.left + window.scrollX,
+        width: rect.width,
+      });
+    }
+
+    updatePosition();
+    window.addEventListener("scroll", updatePosition, true);
+    window.addEventListener("resize", updatePosition);
+    return () => {
+      window.removeEventListener("scroll", updatePosition, true);
+      window.removeEventListener("resize", updatePosition);
+    };
+  }, [open, inputRef]);
+
+  return position;
+}
+
 /* ─── Company selector sub-component ─── */
 
 interface CompanySelectorProps {
@@ -50,6 +95,8 @@ function CompanySelector({
   const inputRef = useRef<HTMLInputElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
+  const portalPos = useDropdownPortal(open, inputRef);
+
   // Sync external value changes
   useEffect(() => {
     setQuery(value);
@@ -57,17 +104,21 @@ function CompanySelector({
 
   // Close dropdown on outside click
   useEffect(() => {
+    if (!open) return;
     function handleClickOutside(e: MouseEvent) {
+      const target = e.target as Node;
       if (
         wrapperRef.current &&
-        !wrapperRef.current.contains(e.target as Node)
+        !wrapperRef.current.contains(target) &&
+        dropdownRef.current &&
+        !dropdownRef.current.contains(target)
       ) {
         setOpen(false);
       }
     }
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
+  }, [open]);
 
   // Scroll dropdown to top when query changes
   useEffect(() => {
@@ -101,7 +152,6 @@ function CompanySelector({
     setQuery(val);
     setOpen(true);
 
-    // Check if typed value matches a known company
     const match = findCompany(val);
     if (match) {
       onCompanyChange(match.name, match.tier);
@@ -122,6 +172,93 @@ function CompanySelector({
   }
 
   const matched = findCompany(value);
+
+  const dropdownContent = open ? (
+    <div
+      className={styles.portalDropdown}
+      ref={dropdownRef}
+      style={{
+        top: portalPos.top,
+        left: portalPos.left,
+        width: portalPos.width,
+      }}
+    >
+      {filteredTier1.length > 0 && (
+        <>
+          <div className={styles.dropdownGroupLabel}>
+            Tier 1 — FAANG & Top-tier ({filteredTier1.length})
+          </div>
+          {filteredTier1.map((c) => (
+            <div
+              key={c.name}
+              className={styles.dropdownItem}
+              onMouseDown={() => selectCompany(c)}
+            >
+              <img
+                src={c.logo}
+                alt=""
+                className={styles.dropdownItemLogo}
+                onError={(e) => {
+                  (e.target as HTMLImageElement).style.display = "none";
+                }}
+              />
+              <span className={styles.dropdownItemName}>{c.name}</span>
+              <span
+                className={`${styles.dropdownTierBadge} ${styles.tierBadge1}`}
+              >
+                T1
+              </span>
+            </div>
+          ))}
+        </>
+      )}
+      {filteredTier2.length > 0 && (
+        <>
+          <div className={styles.dropdownGroupLabel}>
+            Tier 2 — Well-known ({filteredTier2.length})
+          </div>
+          {filteredTier2.map((c) => (
+            <div
+              key={c.name}
+              className={styles.dropdownItem}
+              onMouseDown={() => selectCompany(c)}
+            >
+              <img
+                src={c.logo}
+                alt=""
+                className={styles.dropdownItemLogo}
+                onError={(e) => {
+                  (e.target as HTMLImageElement).style.display = "none";
+                }}
+              />
+              <span className={styles.dropdownItemName}>{c.name}</span>
+              <span
+                className={`${styles.dropdownTierBadge} ${styles.tierBadge2}`}
+              >
+                T2
+              </span>
+            </div>
+          ))}
+        </>
+      )}
+      {!hasResults && query && (
+        <div className={styles.dropdownCustomHint}>
+          Press Enter or continue typing — custom company (Tier 3)
+        </div>
+      )}
+      {!query && (
+        <div className={styles.dropdownCustomHint}>
+          Type to search or enter a custom company name
+        </div>
+      )}
+      {hasResults && totalResults > 8 && (
+        <div className={styles.dropdownScrollHint}>
+          <span className={styles.dropdownScrollHintArrow}>↓</span>
+          Scroll to see more companies
+        </div>
+      )}
+    </div>
+  ) : null;
 
   return (
     <div className={styles.companyFieldWrapper} ref={wrapperRef}>
@@ -149,84 +286,6 @@ function CompanySelector({
             placeholder={placeholder}
             autoComplete="off"
           />
-          {open && (
-            <div className={styles.dropdown} ref={dropdownRef}>
-              {filteredTier1.length > 0 && (
-                <>
-                  <div className={styles.dropdownGroupLabel}>
-                    Tier 1 — FAANG & Top-tier ({filteredTier1.length})
-                  </div>
-                  {filteredTier1.map((c) => (
-                    <div
-                      key={c.name}
-                      className={styles.dropdownItem}
-                      onMouseDown={() => selectCompany(c)}
-                    >
-                      <img
-                        src={c.logo}
-                        alt=""
-                        className={styles.dropdownItemLogo}
-                        onError={(e) => {
-                          (e.target as HTMLImageElement).style.display = "none";
-                        }}
-                      />
-                      <span className={styles.dropdownItemName}>{c.name}</span>
-                      <span
-                        className={`${styles.dropdownTierBadge} ${styles.tierBadge1}`}
-                      >
-                        T1
-                      </span>
-                    </div>
-                  ))}
-                </>
-              )}
-              {filteredTier2.length > 0 && (
-                <>
-                  <div className={styles.dropdownGroupLabel}>
-                    Tier 2 — Well-known ({filteredTier2.length})
-                  </div>
-                  {filteredTier2.map((c) => (
-                    <div
-                      key={c.name}
-                      className={styles.dropdownItem}
-                      onMouseDown={() => selectCompany(c)}
-                    >
-                      <img
-                        src={c.logo}
-                        alt=""
-                        className={styles.dropdownItemLogo}
-                        onError={(e) => {
-                          (e.target as HTMLImageElement).style.display = "none";
-                        }}
-                      />
-                      <span className={styles.dropdownItemName}>{c.name}</span>
-                      <span
-                        className={`${styles.dropdownTierBadge} ${styles.tierBadge2}`}
-                      >
-                        T2
-                      </span>
-                    </div>
-                  ))}
-                </>
-              )}
-              {!hasResults && query && (
-                <div className={styles.dropdownCustomHint}>
-                  Press Enter or continue typing — custom company (Tier 3)
-                </div>
-              )}
-              {!query && (
-                <div className={styles.dropdownCustomHint}>
-                  Type to search or enter a custom company name
-                </div>
-              )}
-              {hasResults && totalResults > 8 && (
-                <div className={styles.dropdownScrollHint}>
-                  <span className={styles.dropdownScrollHintArrow}>↓</span>
-                  Scroll to see more companies
-                </div>
-              )}
-            </div>
-          )}
         </div>
       </div>
       {/* Hidden display showing resolved tier */}
@@ -245,6 +304,180 @@ function CompanySelector({
               : "Tier 3 — Other"}
         </div>
       )}
+      {createPortal(dropdownContent, document.body)}
+    </div>
+  );
+}
+
+/* ─── University selector sub-component ─── */
+
+interface UniversitySelectorProps {
+  value: string;
+  onUniversityChange: (university: string) => void;
+  placeholder?: string;
+}
+
+function UniversitySelector({
+  value,
+  onUniversityChange,
+  placeholder = "Search or select a university…",
+}: UniversitySelectorProps) {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState(value);
+  const wrapperRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  const portalPos = useDropdownPortal(open, inputRef);
+
+  // Sync external value changes
+  useEffect(() => {
+    setQuery(value);
+  }, [value]);
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    if (!open) return;
+    function handleClickOutside(e: MouseEvent) {
+      const target = e.target as Node;
+      if (
+        wrapperRef.current &&
+        !wrapperRef.current.contains(target) &&
+        dropdownRef.current &&
+        !dropdownRef.current.contains(target)
+      ) {
+        setOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [open]);
+
+  // Scroll dropdown to top when query changes
+  useEffect(() => {
+    if (dropdownRef.current) {
+      dropdownRef.current.scrollTop = 0;
+    }
+  }, [query]);
+
+  const filtered = useMemo(() => {
+    if (!query) return TOP_UNIVERSITIES;
+    const q = query.toLowerCase();
+    return TOP_UNIVERSITIES.filter((u) => u.name.toLowerCase().includes(q));
+  }, [query]);
+
+  function selectUniversity(entry: UniversityEntry) {
+    setQuery(entry.name);
+    onUniversityChange(entry.name);
+    setOpen(false);
+  }
+
+  function handleInputChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const val = e.target.value;
+    setQuery(val);
+    setOpen(true);
+    onUniversityChange(val);
+  }
+
+  function handleFocus() {
+    setOpen(true);
+  }
+
+  function handleKeyDown(e: React.KeyboardEvent) {
+    if (e.key === "Escape") {
+      setOpen(false);
+      inputRef.current?.blur();
+    }
+  }
+
+  const matched = findUniversity(value);
+
+  const dropdownContent = open ? (
+    <div
+      className={styles.portalDropdown}
+      ref={dropdownRef}
+      style={{
+        top: portalPos.top,
+        left: portalPos.left,
+        width: portalPos.width,
+      }}
+    >
+      {filtered.length > 0 ? (
+        <>
+          <div className={styles.dropdownGroupLabel}>
+            Top Universities ({filtered.length})
+          </div>
+          {filtered.map((u) => (
+            <div
+              key={u.name}
+              className={styles.dropdownItem}
+              onMouseDown={() => selectUniversity(u)}
+            >
+              <img
+                src={u.logo}
+                alt=""
+                className={styles.dropdownItemLogo}
+                onError={(e) => {
+                  (e.target as HTMLImageElement).style.display = "none";
+                }}
+              />
+              <span className={styles.dropdownItemName}>{u.name}</span>
+              <span
+                className={`${styles.dropdownTierBadge} ${styles.tierBadgeUni}`}
+              >
+                Top
+              </span>
+            </div>
+          ))}
+        </>
+      ) : query ? (
+        <div className={styles.dropdownCustomHint}>
+          No matching university — using custom entry
+        </div>
+      ) : null}
+      {!query && (
+        <div className={styles.dropdownCustomHint}>
+          Type to search or enter a custom university name
+        </div>
+      )}
+      {filtered.length > 8 && (
+        <div className={styles.dropdownScrollHint}>
+          <span className={styles.dropdownScrollHintArrow}>↓</span>
+          Scroll to see more universities
+        </div>
+      )}
+    </div>
+  ) : null;
+
+  return (
+    <div className={styles.companyFieldWrapper} ref={wrapperRef}>
+      <div className={styles.companyInputRow}>
+        {matched && (
+          <img
+            key={matched.name}
+            src={matched.logo}
+            alt={`${matched.name} logo`}
+            className={styles.companyLogo}
+            onError={(e) => {
+              (e.target as HTMLImageElement).style.display = "none";
+            }}
+          />
+        )}
+        <div className={styles.companyInputWrapper}>
+          <input
+            ref={inputRef}
+            className={styles.companyInput}
+            type="text"
+            value={query}
+            onChange={handleInputChange}
+            onFocus={handleFocus}
+            onKeyDown={handleKeyDown}
+            placeholder={placeholder}
+            autoComplete="off"
+          />
+        </div>
+      </div>
+      {createPortal(dropdownContent, document.body)}
     </div>
   );
 }
@@ -368,18 +601,16 @@ export default function InternshipInputForm(): React.ReactElement {
         <section className={styles.section}>
           <h2 className={styles.sectionTitle}>Academic Information</h2>
 
-          <label className={styles.label}>
+          <div className={styles.label}>
             University
-            <input
-              className={styles.input}
-              type="text"
+            <UniversitySelector
               value={academic.university}
-              onChange={(e) =>
-                setAcademic({ ...academic, university: e.target.value })
+              onUniversityChange={(university) =>
+                setAcademic({ ...academic, university })
               }
-              placeholder="e.g. MIT"
+              placeholder="Search MIT, Stanford, Oxford…"
             />
-          </label>
+          </div>
 
           <label className={styles.label}>
             GPA <span className={styles.required}>*</span>
