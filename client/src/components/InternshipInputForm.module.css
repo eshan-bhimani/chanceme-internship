@@ -192,7 +192,7 @@
   box-shadow: 0 0 0 3px rgba(126, 182, 255, 0.1);
 }
 
-/* ─── Dropdown menu ─── */
+/* ─── Dropdown menu (legacy, kept for reference) ─── */
 .dropdown {
   position: absolute;
   top: calc(100% + 6px);
@@ -215,6 +215,69 @@
   animation: dropdownIn 0.25s cubic-bezier(0.16, 1, 0.3, 1);
   scroll-behavior: smooth;
   overscroll-behavior: contain;
+}
+
+/* ─── Portal-based dropdown (renders at body level, always on top) ─── */
+.portalDropdown {
+  position: absolute;
+  background: rgba(16, 16, 36, 0.98);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 14px;
+  backdrop-filter: blur(40px) saturate(1.5);
+  -webkit-backdrop-filter: blur(40px) saturate(1.5);
+  box-shadow:
+    0 24px 80px rgba(0, 0, 0, 0.65),
+    0 8px 32px rgba(0, 0, 0, 0.4),
+    0 0 0 1px rgba(255, 255, 255, 0.06) inset,
+    0 1px 0 rgba(255, 255, 255, 0.08) inset;
+  z-index: 99999;
+  max-height: 380px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 0.35rem;
+  animation: portalDropdownIn 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  scroll-behavior: smooth;
+  overscroll-behavior: contain;
+  font-family: "Inter", "SF Pro Display", -apple-system, BlinkMacSystemFont,
+    "Segoe UI", system-ui, sans-serif;
+  color: #e8eaed;
+}
+
+@keyframes portalDropdownIn {
+  from {
+    opacity: 0;
+    transform: translateY(-8px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.portalDropdown::-webkit-scrollbar {
+  width: 5px;
+}
+
+.portalDropdown::-webkit-scrollbar-track {
+  background: transparent;
+  margin: 6px 0;
+}
+
+.portalDropdown::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.12);
+  border-radius: 10px;
+  transition: background 0.2s ease;
+}
+
+.portalDropdown::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.25);
+}
+
+@supports (scrollbar-width: thin) {
+  .portalDropdown {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255, 255, 255, 0.12) transparent;
+  }
 }
 
 @keyframes dropdownIn {
@@ -341,6 +404,11 @@
 .tierBadge2 {
   background: rgba(180, 140, 255, 0.15);
   color: #b48cff;
+}
+
+.tierBadgeUni {
+  background: rgba(74, 222, 128, 0.15);
+  color: #4ade80;
 }
 
 .dropdownCustomHint {
